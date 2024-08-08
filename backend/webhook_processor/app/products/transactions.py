@@ -105,10 +105,14 @@ class Transactions(AbstractProduct):
         try:
             self.dynamodb.update_item(**params)
             logger.debug(f"Updated cursor to {cursor}")
-            metrics.add_metric(name="UpdateCursorSuccess", unit=MetricUnit.Count, value=1)
+            metrics.add_metric(
+                name="UpdateCursorSuccess", unit=MetricUnit.Count, value=1
+            )
         except botocore.exceptions.ClientError:
             logger.exception(f"Failed to update cursor to {cursor}")
-            metrics.add_metric(name="UpdateCursorFailed", unit=MetricUnit.Count, value=1)
+            metrics.add_metric(
+                name="UpdateCursorFailed", unit=MetricUnit.Count, value=1
+            )
 
     def sync(self, user_id: str, item_id: str) -> None:
         logger.debug("Begin transaction sync")
@@ -130,12 +134,16 @@ class Transactions(AbstractProduct):
 
         # Iterate through each page of new transaction updates for item
         while has_more:
-            metrics.add_metric(name="PlaidTransactionSyncRequest", unit=MetricUnit.Count, value=1)
+            metrics.add_metric(
+                name="PlaidTransactionSyncRequest", unit=MetricUnit.Count, value=1
+            )
 
             params = {
                 "access_token": access_token,
                 "count": constants.PLAID_TRANSACTION_SYNC_COUNT_MAX,
-                "options": TransactionsSyncRequestOptions(include_personal_finance_category=True),
+                "options": TransactionsSyncRequestOptions(
+                    include_personal_finance_category=True
+                ),
             }
             if cursor:
                 params["cursor"] = cursor
@@ -143,7 +151,9 @@ class Transactions(AbstractProduct):
             request = TransactionsSyncRequest(**params)
 
             try:
-                response: TransactionsSyncResponse = self.client.transactions_sync(request)
+                response: TransactionsSyncResponse = self.client.transactions_sync(
+                    request
+                )
             except plaid.ApiException:
                 logger.exception("Failed to call transactions sync")
                 raise
@@ -158,13 +168,16 @@ class Transactions(AbstractProduct):
             cursor = response["next_cursor"]
 
         added = [
-            self.build_message(user_id, item_id, "INSERT", transaction) for transaction in added
+            self.build_message(user_id, item_id, "INSERT", transaction)
+            for transaction in added
         ]
         modified = [
-            self.build_message(user_id, item_id, "MODIFY", transaction) for transaction in modified
+            self.build_message(user_id, item_id, "MODIFY", transaction)
+            for transaction in modified
         ]
         removed = [
-            self.build_message(user_id, item_id, "REMOVE", transaction) for transaction in removed
+            self.build_message(user_id, item_id, "REMOVE", transaction)
+            for transaction in removed
         ]
 
         all_transactions = added + modified + removed
@@ -195,7 +208,9 @@ class Transactions(AbstractProduct):
             new_transactions: int = payload.get("new_transactions", 0)
             logger.info(f"{webhook_code}, new_transactions={new_transactions}")
             metrics.add_metric(
-                name="WebhookNewTransactions", unit=MetricUnit.Count, value=new_transactions
+                name="WebhookNewTransactions",
+                unit=MetricUnit.Count,
+                value=new_transactions,
             )
 
             if new_transactions < 1:
@@ -206,13 +221,19 @@ class Transactions(AbstractProduct):
 
         # https://plaid.com/docs/api/products/transactions/#sync_updates_available
         elif webhook_code == constants.PLAID_WEBHOOK_CODE_SYNC_UPDATES_AVAILABLE:
-            initial_update_complete: bool = payload.get("initial_update_complete", False)
-            historical_update_complete: bool = payload.get("historical_update_complete", False)
+            initial_update_complete: bool = payload.get(
+                "initial_update_complete", False
+            )
+            historical_update_complete: bool = payload.get(
+                "historical_update_complete", False
+            )
 
             logger.info(
                 f"{webhook_code}, initial_update_complete={initial_update_complete}, historical_update_complete={historical_update_complete}"
             )
-            metrics.add_metric(name="WebhookSyncUpdatesAvailable", unit=MetricUnit.Count, value=1)
+            metrics.add_metric(
+                name="WebhookSyncUpdatesAvailable", unit=MetricUnit.Count, value=1
+            )
 
             self.sync(user_id, item_id)
 
@@ -221,7 +242,9 @@ class Transactions(AbstractProduct):
             # Note: Plaid has deprecated this webhook in favor of SYNC_UPDATES_AVAILABLE
 
             removed_transactions: List[str] = payload.get("removed_transactions", [])
-            logger.info(f"{webhook_code}, removed_transactions={len(removed_transactions)}")
+            logger.info(
+                f"{webhook_code}, removed_transactions={len(removed_transactions)}"
+            )
             metrics.add_metric(
                 name="WebhookRemovedTransactions",
                 unit=MetricUnit.Count,
@@ -238,4 +261,6 @@ class Transactions(AbstractProduct):
 
         else:
             logger.warn(f"Unsupported webhook code: {webhook_code}")
-            metrics.add_metric(name="UnknownWebhookCode", unit=MetricUnit.Count, value=1)
+            metrics.add_metric(
+                name="UnknownWebhookCode", unit=MetricUnit.Count, value=1
+            )
